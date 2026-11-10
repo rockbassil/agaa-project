@@ -1,71 +1,123 @@
 # AAGA — Sujet 7 : Superfamilles de réseaux complexes
 
-## What is included
+Comparaison de réseaux non orientés par les six graphlets connexes induits à
+quatre sommets et les profils SRP de Milo et al. (2004).
 
-- `src/superfamilies.py`: connected **induced** 4-node graphlet counting, degree-preserving randomization, SRP calculation, and CSV/JSON/PNG export.
-- `tests/test_graphlets.py`: unit tests for all six motifs, disconnected graphs, and degree preservation.
-- `run_experiments.sh`: one-command tests and experiments (required Bash script).
-- `results/`: actual output of 20 randomizations for each of four datasets.
-- `rapport.pdf`: French report with methodology, actual results, limitations, and bibliography.
+## Livrables
 
-## Setup
+- `rapport.pdf` : rapport français de **10 pages**, références comprises.
+- `rapport.md` : export éditable du texte et des tableaux.
+- `VERIFICATION.md` : contrôle des exigences et réserves.
+- `src/superfamilies.py` : comptage, randomisation, SRP et export.
+- `src/compare_profiles.py` : comparaison et sensibilité.
+- `tests/test_graphlets.py` : dix tests, dont le contrôle des 1 253 graphes du catalogue NetworkX.
+- `data/` : réseaux écologiques archivés et prétraitement documenté.
+- `results/` : expérience principale et deux contrôles.
+- `run_experiments.sh` : commandes de reproduction des expériences.
 
-Requires Python 3.10+.
+## Installation et reproduction
+
+Python 3.10 ou supérieur. Les versions exactes utilisées figurent dans les JSON.
+La graine seule ne garantit pas l'identité entre versions de bibliothèques.
 
 ```bash
 python -m pip install -r requirements.txt
 bash run_experiments.sh
 ```
 
-On Windows, run the Python command directly in PowerShell (or use Git Bash/WSL for the required Bash script):
+Le script prépare les données, lance les tests, puis trois expériences sur les
+six réseaux : 100 tirages, graine 42, 5 échanges par arête ; 100 tirages, graine
+43, 5 échanges ; 100 tirages, graine 42, 20 échanges. Les données sont archivées :
+aucun téléchargement n'est nécessaire pour les simulations. Prévoir plusieurs
+minutes selon la machine. Aucun Makefile n'est nécessaire pour Python.
+
+Commandes équivalentes sous PowerShell :
 
 ```powershell
-python -m pip install -r requirements.txt
+python data/prepare_data.py
 python -m unittest discover -s tests -v
-python src/superfamilies.py --dataset all --repetitions 20 --seed 42 --output results
+python src/superfamilies.py --dataset all --repetitions 100 --seed 42 --swap-multiplier 5 --output results
+python src/superfamilies.py --dataset all --repetitions 100 --seed 43 --swap-multiplier 5 --output results/seed43
+python src/superfamilies.py --dataset all --repetitions 100 --seed 42 --swap-multiplier 20 --output results/swaps20
+python src/compare_profiles.py
 ```
 
-## Command options
+Ces commandes Python ont été exécutées sous Windows. Le lancement Bash sur les
+machines de la PPTI reste à vérifier.
+
+## Options des commandes
 
 ```bash
 python src/superfamilies.py --help
 ```
 
-- `--dataset NAME`: `karate`, `florentine`, `southern_women`, `les_miserables`, or `all`. Repeat option for several.
-- `--edge-list PATH`: add an undirected graph in `u v` edge-list format; repeat for several.
-- `--repetitions N`: number of independently randomized comparison graphs per dataset (default 20).
-- `--seed N`: seed controlling the randomized swaps (default 42).
-- `--swap-multiplier N`: attempted successful double-edge swaps per edge (default 5).
-- `--epsilon X`: positive pseudocount in the ratio formula (default 4).
-- `--output DIR`: folder for `results.json`, `profiles.csv`, `profiles.png`.
+| Option | Rôle et valeur par défaut |
+|---|---|
+| `--dataset NAME` | `karate`, `florentine`, `southern_women`, `les_miserables`, `st_marks`, `benguela`, ou `all`. Répétable. Sans sélection ni fichier externe : tous les réseaux. |
+| `--edge-list PATH` | Graphe au format `u v`, une arête par ligne. Répétable. Utilisée seule : seuls les fichiers indiqués sont analysés. |
+| `--repetitions N` | Nombre de graphes aléatoires, au moins 1. Défaut : 20 ; expériences livrées : 100. |
+| `--seed N` | Graine initiale. Défaut : 42. |
+| `--swap-multiplier N` | Entier positif ou nul : échanges réussis demandés par arête. Défaut : 5. Zéro désactive la randomisation. |
+| `--epsilon X` | Régularisation strictement positive. Défaut : 4. |
+| `--output DIR` | Dossier de sortie. Défaut : `results`. |
 
-## Methodology and interpretation
+Les commentaires commencent par `#`. Doublons et liens réciproques sont
+fusionnés ; les boucles sont retirées mais leurs sommets sont conservés.
+Le format ne décrit pas séparément les sommets isolés : les ajouter dans le code
+si nécessaire. Les noms des jeux de données doivent être distincts.
 
-There are six non-isomorphic connected induced 4-node undirected graphlets: path P4, star K1,3, cycle C4, paw (triangle with pendant), diamond (K4 missing an edge), and K4. Each unique vertex set is counted once. The null graph is generated by repeated double-edge swaps, preserving each vertex degree and the number of edges. The algorithm keeps the graph simple; it does **not** sample uniformly from all graphs with that degree sequence and is not a stub-pairing multigraph implementation. Connectivity is not constrained.
+## Méthode et limites
 
-For motif `i`, observed count `N_i`, mean randomized count `R_i`, and `epsilon=4`:
+Chaque ensemble connexe de quatre sommets est compté une seule fois. Le graphe
+induit comprend toutes les arêtes entre ces sommets. Ordre des motifs :
+`P4`, `K1_3`, `C4`, `paw`, `diamond`, `K4`.
 
-`delta_i = (N_i - R_i) / (N_i + R_i + epsilon)`
+```text
+delta_i = (N_i - R_i) / (N_i + R_i + epsilon)
+SRP_i = delta_i / sqrt(sum_j delta_j**2)
+```
 
-`SRP_i = delta_i / sqrt(sum_j delta_j**2)`
+`N_i` est le comptage observé, `R_i` la moyenne aléatoire. Si tous les écarts
+sont nuls, le profil est nul. Le modèle conserve exactement les degrés dans
+des graphes simples par échanges doubles d'arêtes. Il approche l'ensemble de
+configuration conditionné à rester simple, sans garantie de mélange uniforme
+après un nombre fini d'échanges. Il ne conserve ni connexité ni bipartition.
+Un échec de randomisation est signalé et enregistré dans le JSON.
 
-If all delta values are zero, the SRP is defined here as a zero vector.
+Les quatre jeux NetworkX décrivent un club, des mariages, des affiliations et
+des coapparitions de personnages. Les réseaux trophiques St. Marks et Benguela
+ajoutent un domaine écologique. Leur origine et leurs transformations sont
+documentées dans [data/README.md](data/README.md). Orientation et poids sont ignorés.
+Southern women reste biparti, sans projection ; son contraste avec une référence
+non bipartie doit être interprété en conséquence. Le réseau littéraire provient
+d'une œuvre, et non d'observations de personnes réelles. Six réseaux permettent
+une comparaison exploratoire, sans établir une classification générale.
 
-## Datasets and scope
+## Sorties et rapport
 
-- `karate`: Zachary's karate club social interaction network (NetworkX sample dataset).
-- `florentine`: Florentine family marriage ties (NetworkX sample dataset).
-- `southern_women`: Davis Southern women attendance network, used **as an undirected bipartite graph** without projecting onto one mode (NetworkX sample dataset).
-- `les_miserables`: literary character coappearance network from Victor Hugo’s novel, provided by NetworkX.
+`results.json` conserve les paramètres, versions, comptages observés et aléatoires,
+moyennes, écarts-types, écarts relatifs, SRP et diagnostics. `profiles.csv` et
+`profiles.png` présentent les profils. `similarities.csv` et `similarities.png`
+comparent les profils par cosinus ; `sensitivity.json` mesure leur variation.
+Les contrôles se trouvent dans `seed43/` et `swaps20/`.
 
-These are authentic documented network datasets bundled with NetworkX, but they are social and literary, but still lack biological or technological networks; this is a **limitation** relative to the assignment's ambition to compare several network domains. An external infrastructure/biological network edge list should be added to strengthen the conclusion. The bipartite dataset is structurally distinct, and its lack of triangles is partly imposed by its bipartite nature; the degree-only null does not preserve bipartiteness. Consequently, its SRP contrast can reflect the null model's inability to preserve that constraint.
+```bash
+python -m pip install -r requirements-report.txt
+python src/build_report.py
+```
 
-## Performance
+Le script utilise les résultats existants, produit le PDF et vérifie ses dix
+pages. Il écrit aussi `rapport.md`. Le texte utilisé pour régénérer le PDF est
+dans `src/build_report.py` : modifier seulement l'export Markdown ne modifie pas
+le PDF. Arial est utilisée sous Windows, DejaVu Sans sous Linux. Une variation
+de pagination liée aux polices est signalée par le contrôle du nombre de pages.
 
-The connected four-set enumeration is exact but not suitable for extremely large/high-degree networks. For large datasets, use sampling or specialized graphlet algorithms. The results are stochastic and depend on randomization settings. Twenty randomizations are a demonstration, not a robust statistical confidence assessment.
+## Références
 
-## Bibliography
+Milo et al. (2004), *Superfamilies of Evolved and Designed Networks*, Science
+303(5663), 1538–1542. PDF fourni dans le dossier.
 
-Milo, R., Itzkovitz, S., Kashtan, N., Levitt, R., Shen-Orr, S., Ayzenshtat, I., Sheffer, M., and Alon, U. (2004). *Superfamilies of evolved and designed networks*. Science 303(5663), 1538–1542.
+Calò (2025), *Food webs: edge lists and species names*, Zenodo,
+https://doi.org/10.5281/zenodo.15045517.
 
-NetworkX documentation and example datasets: https://networkx.org/documentation/stable/reference/generators.html
+NetworkX : https://networkx.org/documentation/stable/reference/generators/social.html.

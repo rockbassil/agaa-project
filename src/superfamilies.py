@@ -4,6 +4,9 @@ import csv
 import json
 import math
 import random
+import platform
+import statistics
+import warnings
 from pathlib import Path
 
 import networkx as nx
@@ -22,6 +25,7 @@ def read_edge_list(path):
             if len(parts) != 2:
                 raise ValueError(f'{path}:{number}: expected two vertex identifiers')
             u, v = parts
+            graph.add_nodes_from((u, v))
             if u != v:
                 graph.add_edge(u, v)
     return graph
@@ -33,6 +37,8 @@ def datasets():
         'florentine': nx.florentine_families_graph(),
         'southern_women': nx.davis_southern_women_graph(),
         'les_miserables': nx.les_miserables_graph(),
+        'st_marks': read_edge_list(Path(__file__).resolve().parents[1] / 'data/st_marks.txt'),
+        'benguela': read_edge_list(Path(__file__).resolve().parents[1] / 'data/benguela.txt'),
     }
 
 
@@ -94,15 +100,21 @@ def random_degree_preserving(graph, seed, swap_multiplier=5):
     Connectedness is NOT enforced: this is a simple-graph degree-sequence
     preserving null, not an independent multigraph stub-pairing draw.
     """
+    if not isinstance(swap_multiplier, int) or swap_multiplier < 0:
+        raise ValueError('swap_multiplier must be a nonnegative integer')
     graph = nx.Graph(graph)
+    graph.remove_edges_from(nx.selfloop_edges(graph))
     swaps = swap_multiplier * graph.number_of_edges()
+    graph.graph['swap_target_reached'] = True
+    graph.graph['swap_error'] = None
     if graph.number_of_edges() < 2 or swaps == 0:
         return graph
     try:
         nx.double_edge_swap(graph, nswap=swaps, max_tries=max(100, swaps * 100), seed=seed)
-    except (nx.NetworkXAlgorithmError, nx.NetworkXError):
-        # A saturated degree sequence may permit no further swaps.
-        pass
+    except (nx.NetworkXAlgorithmError, nx.NetworkXError) as error:
+        graph.graph['swap_target_reached'] = False
+        graph.graph['swap_error'] = str(error)
+        warnings.warn(f'Degree-preserving randomization incomplete: {error}', RuntimeWarning)
     return graph
 
 
@@ -116,8 +128,10 @@ def analyze(graph, repetitions=20, seed=42, swap_multiplier=5, epsilon=4.0):
     observed = count_graphlets(graph)
     rng = random.Random(seed)
     null_counts = []
+    incomplete = 0
     for _ in range(repetitions):
         random_graph = random_degree_preserving(graph, rng.randrange(2**32), swap_multiplier)
+        incomplete += not random_graph.graph['swap_target_reached']
         null_counts.append(count_graphlets(random_graph))
     means = {key: sum(row[key] for row in null_counts) / repetitions for key in MOTIFS}
     delta = {key: (observed[key] - means[key]) / (observed[key] + means[key] + epsilon) for key in MOTIFS}
@@ -127,6 +141,10 @@ def analyze(graph, repetitions=20, seed=42, swap_multiplier=5, epsilon=4.0):
         'vertices': graph.number_of_nodes(), 'edges': graph.number_of_edges(),
         'repetitions': repetitions, 'seed': seed, 'swap_multiplier': swap_multiplier,
         'epsilon': epsilon, 'observed': observed, 'null_mean': means,
+        'null_std': {key: statistics.stdev(row[key] for row in null_counts)
+                     if repetitions > 1 else 0.0 for key in MOTIFS},
+        'null_counts': null_counts, 'incomplete_randomizations': incomplete,
+        'versions': {'python': platform.python_version(), 'networkx': nx.__version__},
         'delta': delta, 'srp': srp,
     }
 
@@ -136,7 +154,7 @@ def save_results(results, output):
     output.mkdir(parents=True, exist_ok=True)
     (output / 'results.json').write_text(json.dumps(results, indent=2), encoding='utf-8')
     with (output / 'profiles.csv').open('w', newline='', encoding='utf-8') as handle:
-        writer = csv.writer(handle)
+        writer = csv.writer(handle, lineterminator='\n')
         writer.writerow(['dataset', 'nodes', 'edges', 'motif', 'observed', 'null_mean', 'delta', 'srp'])
         for name, result in results.items():
             for motif in MOTIFS:
@@ -171,9 +189,11 @@ def main():
     parser.add_argument('--output', type=Path, default=Path('results'))
     args = parser.parse_args()
     chosen = datasets()
-    selected = chosen if not args.dataset or 'all' in args.dataset else {k: chosen[k] for k in args.dataset}
+    selected = chosen if 'all' in args.dataset or (not args.dataset and not args.edge_list) else {k: chosen[k] for k in args.dataset}
     selected = dict(selected)
     for path in args.edge_list:
+        if path.stem in selected:
+            parser.error(f'duplicate dataset name: {path.stem}')
         selected[path.stem] = read_edge_list(path)
     results = {}
     for name, graph in selected.items():

@@ -1,0 +1,66 @@
+{
+  "seed43": {
+    "karate": {
+      "cosine": 0.9898906529601827,
+      "l2_distance": 0.14219245436954225,
+      "max_absolute_difference": 0.07954473032501885
+    },
+    "florentine": {
+      "cosine": 0.9714685409104034,
+      "l2_distance": 0.23887845901041985,
+      "max_absolute_difference": 0.1833456113357491
+    },
+    "southern_women": {
+      "cosine": 0.9999897148782699,
+      "l2_distance": 0.004535443027991819,
+      "max_absolute_difference": 0.002737663018951342
+    },
+    "les_miserables": {
+      "cosine": 0.9999472435530724,
+      "l2_distance": 0.010271946935952882,
+      "max_absolute_difference": 0.008998555636701041
+    },
+    "st_marks": {
+      "cosine": 0.9999739750158201,
+      "l2_distance": 0.007214566401368747,
+      "max_absolute_difference": 0.004503985814257344
+    },
+    "benguela": {
+      "cosine": 0.9999563775197603,
+      "l2_distance": 0.009340501082883023,
+      "max_absolute_difference": 0.007325053021347283
+    }
+  },
+  "swaps20": {
+    "karate": {
+      "cosine": 0.9868554768599954,
+      "l2_distance": 0.16213897211962744,
+      "max_absolute_difference": 0.08191202049266014
+    },
+    "florentine": {
+      "cosine": 0.9879759610267265,
+      "l2_distance": 0.15507442711984,
+      "max_absolute_difference": 0.11171931670576699
+    },
+    "southern_women": {
+      "cosine": 0.9999672039175832,
+      "l2_distance": 0.008098898988962065,
+      "max_absolute_difference": 0.006662316189380457
+    },
+    "les_miserables": {
+      "cosine": 0.99999863413124,
+      "l2_distance": 0.001652796877984442,
+      "max_absolute_difference": 0.0010113746266526835
+    },
+    "st_marks": {
+      "cosine": 0.9997919739436416,
+      "l2_distance": 0.02039735553244001,
+      "max_absolute_difference": 0.015527339042554766
+    },
+    "benguela": {
+      "cosine": 0.9994256752249796,
+      "l2_distance": 0.03389173276834731,
+      "max_absolute_difference": 0.024583654235342665
+    }
+  }
+}
